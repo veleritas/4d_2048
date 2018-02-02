@@ -20,17 +20,18 @@ uint64_t get_val(uint64_t value, int pos)
     return (value & mask) >> (4 * pos);
 }
 
-uint64_t init_board()
+uint64_t spawn_tile(uint64_t state)
 {
-    // Return starting state of game.
+    // Spawn a tile in a random position.
+    // Assumes there's at least one empty position.
 
     std::uniform_int_distribution<> temp(0, CELLS-1);
 
-    int pos[2] = {0};
-    while (pos[0] == pos[1])
-        pos[0] = temp(gen), pos[1] = temp(gen);
+    int pos = temp(gen);
+    while (state & (0xFULL << (4 * pos)))
+        pos = temp(gen);
 
-    return (new_tile() << (4 * pos[0])) | (new_tile() << (4 * pos[1]));
+    return state | (new_tile() << (4 * pos));
 }
 
 void draw_board(uint64_t state)
@@ -55,7 +56,7 @@ void draw_board(uint64_t state)
 
 int main()
 {
-    uint64_t state = init_board();
+    uint64_t state = spawn_tile(spawn_tile(0));
     draw_board(state);
 
     return 0;
