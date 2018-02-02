@@ -16,8 +16,7 @@ uint64_t new_tile()
 uint64_t get_val(uint64_t value, int pos)
 {
     // Return the value at a given position.
-    uint64_t mask = 0xFULL << (4 * pos);
-    return (value & mask) >> (4 * pos);
+    return (value >> (4 * pos)) & 0xF;
 }
 
 uint64_t spawn_tile(uint64_t state)
