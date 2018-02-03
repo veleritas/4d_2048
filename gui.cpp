@@ -11,6 +11,7 @@ std::uniform_int_distribution<> dist(0, 9); // [0, 9]
 
 // Store move lookup table for moving left arrow key
 uint16_t move_L[MAX_VALS];
+uint16_t move_R[MAX_VALS];
 
 uint64_t new_tile()
 {
@@ -67,6 +68,11 @@ void draw_row(uint16_t row)
     printf("\n");
 }
 
+uint16_t flip_row(uint16_t row)
+{
+    return (row >> 12) | ((row >> 4) & 0x00F0) | ((row << 4) & 0x0F00) | (row << 12);
+}
+
 void init_L()
 {
     // Generate lookup tables for moving left.
@@ -86,8 +92,34 @@ void init_L()
     }
 }
 
+void init_R()
+{
+    for (int i=0; i<MAX_VALS; i++)
+    {
+        uint16_t temp = ((i & 0xFF) << 8) | (i >> 8);
+        move_R[i] = flip_row(move_L[temp]);
+    }
+}
+
+void init_moves()
+{
+    init_L();
+    init_R();
+}
+
 int main()
 {
+    init_moves();
+
+    uint16_t hi = 0xaa01;
+
+    draw_row(hi);
+    draw_row(move_L[hi]);
+    draw_row(move_R[hi]);
+
+    return 0;
+
+
     init_L();
 
     uint64_t state = spawn_tile(spawn_tile(0));
