@@ -2,11 +2,15 @@
 #include <random>
 using namespace std;
 
-const int CELLS = 16;
+static const int CELLS = 16;
+static const int MAX_VALS = 65536; // 2^16
 
 std::random_device rd;
 std::mt19937 gen(rd());
 std::uniform_int_distribution<> dist(0, 9); // [0, 9]
+
+// Store move lookup table for moving left arrow key
+uint16_t move_L[MAX_VALS];
 
 uint64_t new_tile()
 {
@@ -53,8 +57,39 @@ void draw_board(uint64_t state)
     }
 }
 
+void draw_row(uint16_t row)
+{
+    for (int i=0; i<4; i++)
+    {
+        printf("%x", row & 0xF);
+        row >>= 4;
+    }
+    printf("\n");
+}
+
+void init_L()
+{
+    // Generate lookup tables for moving left.
+
+    for (int i=0; i<MAX_VALS; i++)
+    {
+        uint16_t lower = i & 0xFF;
+        uint16_t upper = i >> 8;
+
+        if ((lower > 0 && lower < 0xFF) && ((lower & 0xF) == (lower >> 4)))
+            lower = (lower & 0xF) + 1;
+
+        if ((upper > 0 && upper < 0xFF) && ((upper & 0xF) == (upper >> 4)))
+            upper = (upper & 0xF) + 1;
+
+        move_L[i] = (upper << 8) | lower;
+    }
+}
+
 int main()
 {
+    init_L();
+
     uint64_t state = spawn_tile(spawn_tile(0));
     draw_board(state);
 
