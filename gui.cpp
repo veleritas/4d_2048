@@ -69,7 +69,7 @@ void draw_row(uint16_t row)
     printf("\n");
 }
 
-uint16_t flip_row(uint16_t row)
+row_t flip_row(row_t row)
 {
     return (row >> 12) | ((row >> 4) & 0x00F0) | ((row << 4) & 0x0F00) | (row << 12);
 }
@@ -100,10 +100,7 @@ void init_L()
 void init_R()
 {
     for (int i=0; i<MAX_VALS; i++)
-    {
-        uint16_t temp = ((i & 0xFF) << 8) | (i >> 8);
-        move_R[i] = flip_row(move_L[temp]);
-    }
+        move_R[i] = flip_row(move_L[flip_row(i)]);
 }
 
 void init_moves()
@@ -121,6 +118,19 @@ static inline board_t move_board_L(board_t state)
     res |= board_t(move_L[(state >> 16) & ROW_MASK]) << 16;
     res |= board_t(move_L[(state >> 32) & ROW_MASK]) << 32;
     res |= board_t(move_L[(state >> 48) & ROW_MASK]) << 48;
+
+    return res;
+}
+
+static inline board_t move_board_R(board_t state)
+{
+    // Move the entire board to the right.
+    board_t res = 0;
+
+    res |= board_t(move_R[(state >> 0) & ROW_MASK]) << 0;
+    res |= board_t(move_R[(state >> 16) & ROW_MASK]) << 16;
+    res |= board_t(move_R[(state >> 32) & ROW_MASK]) << 32;
+    res |= board_t(move_R[(state >> 48) & ROW_MASK]) << 48;
 
     return res;
 }
@@ -145,7 +155,7 @@ int main()
     board_t state = rand_start();
     draw_board(state);
 
-    state = move_board_L(state);
+    state = move_board_R(state);
     draw_board(state);
 
     return 0;
