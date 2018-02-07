@@ -2,8 +2,8 @@
 #include <random>
 using namespace std;
 
-typedef uint64_t board_t;
 typedef uint16_t row_t;
+typedef uint64_t board_t;
 
 static const int CELLS = 16;
 static const int MAX_VALS = 65536; // 2^16
@@ -16,11 +16,15 @@ std::mt19937 gen(rd());
 std::uniform_int_distribution<> dist(0, 9); // [0, 9]
 
 // Store move lookup tables
-row_t move_L[MAX_VALS];
-row_t move_R[MAX_VALS];
-board_t move_U[MAX_VALS];
-board_t move_D[MAX_VALS];
+row_t move_L[MAX_VALS]; // left arrow
+row_t move_R[MAX_VALS]; // right arrow
+board_t move_T[MAX_VALS]; // up arrow (top)
+board_t move_B[MAX_VALS]; // down arrow (bottom)
 
+row_t move_A[MAX_VALS]; // A key
+row_t move_D[MAX_VALS]; // D key
+board_t move_W[MAX_VALS]; // W key
+board_t move_S[MAX_VALS]; // S key
 
 // Transpose rows/columns in a board:
 //   0123       048c
@@ -120,6 +124,32 @@ void init_LR()
         move_R[i] = flip_row(move_L[flip_row(i)]);
 }
 
+void init_AD()
+{
+    // Generate lookup tables for moving 4D left and right (A, D keys).
+
+    for (int i=0; i<MAX_VALS; i++)
+    {
+        row_t even = i & 0x0F0F;
+        row_t odd = (i & 0xF0F0) >> 4;
+
+        if ((even & 0xF) == 0)
+            even >>= 8;
+        else if ((even < 0x0F0F) && ((even & 0xF) == (even >> 8)))
+            even = (even & 0xF) + 1;
+
+        if ((odd & 0xF) == 0)
+            odd >>= 8;
+        else if ((odd < 0x0F0F) && ((odd & 0xF) == (odd >> 8)))
+            odd = (odd & 0xF) + 1;
+
+        move_A[i] = (odd << 4) | even;
+    }
+
+    for (int i=0; i<MAX_VALS; i++)
+        move_D[i] = flip_row(move_A[flip_row(i)]);
+}
+
 board_t row_to_col(row_t row)
 {
     // Convert a row into a column (flipped along diagonal).
@@ -127,20 +157,32 @@ board_t row_to_col(row_t row)
     return (tmp | (tmp << 12) | (tmp << 24) | (tmp << 36)) & COL_MASK;
 }
 
-void init_UD()
+void init_TB()
 {
-    // Generate lookup tables for moving up and down.
+    // Generate lookup tables for moving up and down (arrow keys).
     for (int i=0; i<MAX_VALS; i++)
-        move_U[i] = row_to_col(move_L[i]);
+        move_T[i] = row_to_col(move_L[i]);
 
     for (int i=0; i<MAX_VALS; i++)
-        move_D[i] = row_to_col(move_R[i]);
+        move_B[i] = row_to_col(move_R[i]);
+}
+
+void init_WS()
+{
+    // Generate lookup tables for moving 4D up and down (W and S keys).
+    for (int i=0; i<MAX_VALS; i++)
+        move_W[i] = row_to_col(move_A[i]);
+
+    for (int i=0; i<MAX_VALS; i++)
+        move_S[i] = row_to_col(move_D[i]);
 }
 
 void init_moves()
 {
     init_LR();
-    init_UD();
+    init_TB();
+    init_AD();
+    init_WS();
 }
 
 board_t move_board_L(board_t state)
@@ -169,28 +211,30 @@ board_t move_board_R(board_t state)
     return res;
 }
 
-board_t move_board_U(board_t state)
+board_t move_board_T(board_t state)
 {
+    // Up arrow (top)
     board_t temp = transpose(state);
     board_t res = 0;
 
-    res |= move_U[(temp >> 0) & ROW_MASK] << 0;
-    res |= move_U[(temp >> 16) & ROW_MASK] << 4;
-    res |= move_U[(temp >> 32) & ROW_MASK] << 8;
-    res |= move_U[(temp >> 48) & ROW_MASK] << 12;
+    res |= move_T[(temp >> 0) & ROW_MASK] << 0;
+    res |= move_T[(temp >> 16) & ROW_MASK] << 4;
+    res |= move_T[(temp >> 32) & ROW_MASK] << 8;
+    res |= move_T[(temp >> 48) & ROW_MASK] << 12;
 
     return res;
 }
 
-board_t move_board_D(board_t state)
+board_t move_board_B(board_t state)
 {
+    // Down arrow (bottom)
     board_t temp = transpose(state);
     board_t res = 0;
 
-    res |= move_D[(temp >> 0) & ROW_MASK] << 0;
-    res |= move_D[(temp >> 16) & ROW_MASK] << 4;
-    res |= move_D[(temp >> 32) & ROW_MASK] << 8;
-    res |= move_D[(temp >> 48) & ROW_MASK] << 12;
+    res |= move_B[(temp >> 0) & ROW_MASK] << 0;
+    res |= move_B[(temp >> 16) & ROW_MASK] << 4;
+    res |= move_B[(temp >> 32) & ROW_MASK] << 8;
+    res |= move_B[(temp >> 48) & ROW_MASK] << 12;
 
     return res;
 }
@@ -212,6 +256,22 @@ int main()
 {
     init_moves();
 
+    row_t hi = 0x2222;
+    draw_row(hi);
+
+    draw_row(move_A[hi]);
+    draw_row(move_D[hi]);
+
+    cout << endl;
+
+    draw_row(move_L[hi]);
+    draw_row(move_R[hi]);
+
+
+    return 0;
+
+
+/*
     board_t state = rand_start();
     draw_board(state);
 
@@ -219,6 +279,7 @@ int main()
     draw_board(state);
 
     return 0;
+*/
 
 /*
     init_moves();
