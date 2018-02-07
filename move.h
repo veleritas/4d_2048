@@ -163,3 +163,59 @@ board_t move_board_B(board_t state)
 
     return res;
 }
+
+//------------------------------------------------------------------------------
+
+board_t move_board_A(board_t state)
+{
+    // Move the entire board 4D left (A key).
+    board_t res = 0;
+
+    res |= board_t(move_A[(state >> 0) & ROW_MASK]) << 0;
+    res |= board_t(move_A[(state >> 16) & ROW_MASK]) << 16;
+    res |= board_t(move_A[(state >> 32) & ROW_MASK]) << 32;
+    res |= board_t(move_A[(state >> 48) & ROW_MASK]) << 48;
+
+    return res;
+}
+
+board_t move_board_D(board_t state)
+{
+    // Move the entire board 4D right (D key).
+    board_t res = 0;
+
+    res |= board_t(move_D[(state >> 0) & ROW_MASK]) << 0;
+    res |= board_t(move_D[(state >> 16) & ROW_MASK]) << 16;
+    res |= board_t(move_D[(state >> 32) & ROW_MASK]) << 32;
+    res |= board_t(move_D[(state >> 48) & ROW_MASK]) << 48;
+
+    return res;
+}
+
+board_t move_board_W(board_t state)
+{
+    // Move board 4D up (W key).
+    board_t temp = transpose(state);
+    board_t res = 0;
+
+    res |= move_W[(temp >> 0) & ROW_MASK] << 0;
+    res |= move_W[(temp >> 16) & ROW_MASK] << 4;
+    res |= move_W[(temp >> 32) & ROW_MASK] << 8;
+    res |= move_W[(temp >> 48) & ROW_MASK] << 12;
+
+    return res;
+}
+
+board_t move_board_S(board_t state)
+{
+    // Move board 4D down (S key).
+    board_t temp = transpose(state);
+    board_t res = 0;
+
+    res |= move_S[(temp >> 0) & ROW_MASK] << 0;
+    res |= move_S[(temp >> 16) & ROW_MASK] << 4;
+    res |= move_S[(temp >> 32) & ROW_MASK] << 8;
+    res |= move_S[(temp >> 48) & ROW_MASK] << 12;
+
+    return res;
+}
