@@ -8,6 +8,8 @@ typedef uint64_t board_t;
 static const int CELLS = 16;
 static const int MAX_VALS = 65536; // 2^16
 
+static const int NUM_MOVES = 8;
+
 static const row_t ROW_MASK = 0xFFFF;
 static const board_t COL_MASK = 0x000F000F000F000FULL;
 
