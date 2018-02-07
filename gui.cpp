@@ -8,16 +8,36 @@ typedef uint16_t row_t;
 static const int CELLS = 16;
 static const int MAX_VALS = 65536; // 2^16
 
-static const uint16_t ROW_MASK = 0xFFFF;
+static const row_t ROW_MASK = 0xFFFF;
+static const board_t COL_MASK = 0x000F000F000F000FULL;
 
 std::random_device rd;
 std::mt19937 gen(rd());
 std::uniform_int_distribution<> dist(0, 9); // [0, 9]
 
 // Store move lookup tables
-
 row_t move_L[MAX_VALS];
 row_t move_R[MAX_VALS];
+board_t move_U[MAX_VALS];
+board_t move_D[MAX_VALS];
+
+
+// Transpose rows/columns in a board:
+//   0123       048c
+//   4567  -->  159d
+//   89ab       26ae
+//   cdef       37bf
+board_t transpose(board_t x)
+{
+    board_t a1 = x & 0xF0F00F0FF0F00F0FULL;
+    board_t a2 = x & 0x0000F0F00000F0F0ULL;
+    board_t a3 = x & 0x0F0F00000F0F0000ULL;
+    board_t a = a1 | (a2 << 12) | (a3 >> 12);
+    board_t b1 = a & 0xFF00FF0000FF00FFULL;
+    board_t b2 = a & 0x00FF00FF00000000ULL;
+    board_t b3 = a & 0x00000000FF00FF00ULL;
+    return b1 | (b2 >> 24) | (b3 << 24);
+}
 
 uint64_t new_tile()
 {
@@ -74,9 +94,9 @@ row_t flip_row(row_t row)
     return (row >> 12) | ((row >> 4) & 0x00F0) | ((row << 4) & 0x0F00) | (row << 12);
 }
 
-void init_L()
+void init_LR()
 {
-    // Generate lookup tables for moving left.
+    // Generate lookup tables for moving left and right.
 
     for (int i=0; i<MAX_VALS; i++)
     {
@@ -95,21 +115,35 @@ void init_L()
 
         move_L[i] = (upper << 8) | lower;
     }
-}
 
-void init_R()
-{
     for (int i=0; i<MAX_VALS; i++)
         move_R[i] = flip_row(move_L[flip_row(i)]);
 }
 
-void init_moves()
+board_t row_to_col(row_t row)
 {
-    init_L();
-    init_R();
+    // Convert a row into a column (flipped along diagonal).
+    board_t tmp = row;
+    return (tmp | (tmp << 12) | (tmp << 24) | (tmp << 36)) & COL_MASK;
 }
 
-static inline board_t move_board_L(board_t state)
+void init_UD()
+{
+    // Generate lookup tables for moving up and down.
+    for (int i=0; i<MAX_VALS; i++)
+        move_U[i] = row_to_col(move_L[i]);
+
+    for (int i=0; i<MAX_VALS; i++)
+        move_D[i] = row_to_col(move_R[i]);
+}
+
+void init_moves()
+{
+    init_LR();
+    init_UD();
+}
+
+board_t move_board_L(board_t state)
 {
     // Move the entire board left.
     board_t res = 0;
@@ -122,7 +156,7 @@ static inline board_t move_board_L(board_t state)
     return res;
 }
 
-static inline board_t move_board_R(board_t state)
+board_t move_board_R(board_t state)
 {
     // Move the entire board to the right.
     board_t res = 0;
@@ -131,6 +165,32 @@ static inline board_t move_board_R(board_t state)
     res |= board_t(move_R[(state >> 16) & ROW_MASK]) << 16;
     res |= board_t(move_R[(state >> 32) & ROW_MASK]) << 32;
     res |= board_t(move_R[(state >> 48) & ROW_MASK]) << 48;
+
+    return res;
+}
+
+board_t move_board_U(board_t state)
+{
+    board_t temp = transpose(state);
+    board_t res = 0;
+
+    res |= move_U[(temp >> 0) & ROW_MASK] << 0;
+    res |= move_U[(temp >> 16) & ROW_MASK] << 4;
+    res |= move_U[(temp >> 32) & ROW_MASK] << 8;
+    res |= move_U[(temp >> 48) & ROW_MASK] << 12;
+
+    return res;
+}
+
+board_t move_board_D(board_t state)
+{
+    board_t temp = transpose(state);
+    board_t res = 0;
+
+    res |= move_D[(temp >> 0) & ROW_MASK] << 0;
+    res |= move_D[(temp >> 16) & ROW_MASK] << 4;
+    res |= move_D[(temp >> 32) & ROW_MASK] << 8;
+    res |= move_D[(temp >> 48) & ROW_MASK] << 12;
 
     return res;
 }
@@ -155,7 +215,7 @@ int main()
     board_t state = rand_start();
     draw_board(state);
 
-    state = move_board_R(state);
+    state = move_board_D(state);
     draw_board(state);
 
     return 0;
