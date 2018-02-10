@@ -34,10 +34,10 @@ bool game_over(board_t state)
     // Determines whether the game is over.
 
     for (int i=0; i<NUM_MOVES; i++)
-        if (move_board(state) != state)
-            return true;
+        if (move_board(i, state) != state)
+            return false;
 
-    return false;
+    return true;
 }
 
 int main()
@@ -47,10 +47,25 @@ int main()
     board_t state = spawn_tile(spawn_tile(0));
     draw_board(state);
 
-    cout << endl;
+    std::uniform_int_distribution<> rmove(0, 7);
 
-    state = move_board_L(state);
-    draw_board(state);
+    while (!game_over(state))
+    {
+        // generate valid move
+        int move = rmove(gen);
+        while (move_board(move, state) == state)
+            move = rmove(gen);
+
+
+        printf("Moving: %c\n", MOVE_NAME[move]);
+        state = move_board(move, state);
+        state = spawn_tile(state);
+
+        printf("After move:\n");
+        draw_board(state);
+
+        getchar();
+    }
 
     return 0;
 }

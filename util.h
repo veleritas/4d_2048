@@ -13,6 +13,8 @@ static const int NUM_MOVES = 8;
 static const row_t ROW_MASK = 0xFFFF;
 static const board_t COL_MASK = 0x000F000F000F000FULL;
 
+static const char MOVE_NAME[] = "LTRBAWDS";
+
 std::random_device rd;
 std::mt19937 gen(rd());
 std::uniform_int_distribution<> dist(0, 9); // [0, 9] 0 to 9 inclusive
