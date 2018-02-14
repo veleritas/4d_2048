@@ -1,5 +1,13 @@
 #include "move.h"
 
+#include <unistd.h>
+#include <cassert>
+
+const double SCORE_EMPTY = 1000;
+
+double row_score[MAX_VALS];
+double row_heur_score[MAX_VALS];
+
 board_t move_board(int direction, board_t state)
 {
     // Move a board in a given direction.
@@ -40,9 +48,71 @@ bool game_over(board_t state)
     return true;
 }
 
+void init_heuristics()
+{
+    // Pre-calculate heuristic scores for all board positions.
+
+    for (int i=0; i<MAX_VALS; i++)
+    {
+        double score = 0;
+        int num_empty = 0;
+
+        for (int j=0; j<4; j++)
+        {
+            int val = (i >> (4 * j)) & 0xF;
+            if (val == 0) // empty square
+                num_empty++;
+            else if (val >= 2)
+                score += (val - 1) * (1 << val);
+        }
+
+        row_score[i] = score;
+        row_heur_score[i] = num_empty * SCORE_EMPTY;
+    }
+}
+
+double board_value(board_t state)
+{
+    double value = 0;
+    value += row_score[(state >> 0) & ROW_MASK];
+    value += row_score[(state >> 16) & ROW_MASK];
+    value += row_score[(state >> 32) & ROW_MASK];
+    value += row_score[(state >> 48) & ROW_MASK];
+
+    value += row_heur_score[(state >> 0) & ROW_MASK];
+    value += row_heur_score[(state >> 16) & ROW_MASK];
+    value += row_heur_score[(state >> 32) & ROW_MASK];
+    value += row_heur_score[(state >> 48) & ROW_MASK];
+
+    return value;
+}
+
+int find_best_move(board_t state)
+{
+    // Given a board state, find the best move to make.
+
+    int best_dir = -1;
+    double best_val = -1;
+    for (int i=0; i<NUM_MOVES; i++)
+    {
+        board_t res = move_board(i, state);
+        if (res != state) // is a valid move
+        {
+            double move_val = board_value(res);
+            if (move_val > best_val)
+                best_dir = i, best_val = move_val;
+        }
+    }
+
+    assert(best_dir != -1);
+    return best_dir;
+}
+
 int main()
 {
     init_moves();
+
+    init_heuristics();
 
     board_t state = spawn_tile(spawn_tile(0));
     draw_board(state);
@@ -51,11 +121,7 @@ int main()
 
     while (!game_over(state))
     {
-        // generate valid move
-        int move = rmove(gen);
-        while (move_board(move, state) == state)
-            move = rmove(gen);
-
+        int move = find_best_move(state);
 
         printf("Moving: %c\n", MOVE_NAME[move]);
         state = move_board(move, state);
@@ -64,7 +130,10 @@ int main()
         printf("After move:\n");
         draw_board(state);
 
-        getchar();
+        // usleep() in microseconds, must multiply by 1000 to get milliseconds
+        usleep(200 * 1000);
+
+//        getchar();
     }
 
     return 0;
