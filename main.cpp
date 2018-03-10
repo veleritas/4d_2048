@@ -4,6 +4,7 @@
 #include <cassert>
 
 const double SCORE_EMPTY = 1000;
+const int MAX_DEPTH = 3;
 
 double row_score[MAX_VALS];
 double row_heur_score[MAX_VALS];
@@ -87,6 +88,54 @@ double board_value(board_t state)
     return value;
 }
 
+double eval_move(board_t state, int depth);
+
+double eval_spawn(board_t state, int depth)
+{
+    int empty = 0;
+    for (int i=0; i<CELLS; i++)
+        empty += (((state >> (4 * i)) & 0xF) == 0);
+
+    double eval = 0;
+    for (int i=0; i<CELLS; i++)
+        if (((state >> (4 * i)) & 0xF) == 0) // empty spot
+        {
+            // Try spawning, and see what the score will be.
+
+            eval += 0.9 * eval_move(state | (board_t(1) << (4 * i)), depth+1);
+            eval += 0.1 * eval_move(state | (board_t(2) << (4 * i)), depth+1);
+        }
+
+    return eval / empty;
+}
+
+double eval_move(board_t state, int depth)
+{
+    /*
+     * Given a board state, determine the best possible heuristic score
+     * which can be achieved. Picks a single move from the possible moves.
+     */
+    if (depth == MAX_DEPTH)
+        return board_value(state);
+
+    double best = -1;
+    for (int i=0; i<NUM_MOVES; i++)
+    {
+        board_t res = move_board(i, state);
+        if (res != state)
+        {
+            double hscore = eval_spawn(res, depth);
+            if (hscore > best)
+                best = hscore;
+        }
+    }
+
+    if (best < 0) // No valid moves left (game ends).
+        return board_value(state);
+
+    return best;
+}
+
 int find_best_move(board_t state)
 {
     // Given a board state, find the best move to make.
@@ -98,9 +147,9 @@ int find_best_move(board_t state)
         board_t res = move_board(i, state);
         if (res != state) // is a valid move
         {
-            double move_val = board_value(res);
-            if (move_val > best_val)
-                best_dir = i, best_val = move_val;
+            double hscore = eval_move(res, 0);
+            if (hscore > best_val)
+                best_dir = i, best_val = hscore;
         }
     }
 
@@ -117,8 +166,6 @@ int main()
     board_t state = spawn_tile(spawn_tile(0));
     draw_board(state);
 
-    std::uniform_int_distribution<> rmove(0, 7);
-
     while (!game_over(state))
     {
         int move = find_best_move(state);
@@ -131,7 +178,7 @@ int main()
         draw_board(state);
 
         // usleep() in microseconds, must multiply by 1000 to get milliseconds
-        usleep(200 * 1000);
+//        usleep(100 * 1000);
 
 //        getchar();
     }
