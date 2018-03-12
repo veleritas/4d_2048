@@ -3,6 +3,8 @@
 #include <unistd.h>
 #include <cassert>
 
+#include <fstream>
+
 const double SCORE_EMPTY = 1000;
 const int MAX_DEPTH = 3;
 
@@ -157,30 +159,48 @@ int find_best_move(board_t state)
     return best_dir;
 }
 
-int main()
+board_t play_game(bool draw_game)
 {
-    init_moves();
-
-    init_heuristics();
+    // Play a single game and return the end position of the game.
+    // Draw the game state to the screen if directed to do so.
 
     board_t state = spawn_tile(spawn_tile(0));
-    draw_board(state);
+
+    if (draw_game)
+        draw_board(state);
 
     while (!game_over(state))
     {
         int move = find_best_move(state);
 
-        printf("Moving: %c\n", MOVE_NAME[move]);
+        if (draw_game)
+            printf("Moving: %c\n", MOVE_NAME[move]);
+
         state = move_board(move, state);
         state = spawn_tile(state);
 
-        printf("After move:\n");
-        draw_board(state);
+        if (draw_game)
+        {
+            printf("After move:\n");
+            draw_board(state);
+        }
+    }
 
-        // usleep() in microseconds, must multiply by 1000 to get milliseconds
-//        usleep(100 * 1000);
+    return state;
+}
 
-//        getchar();
+int main()
+{
+    init_moves();
+    init_heuristics();
+
+    ofstream fout("res.txt");
+
+    int NUM_GAMES = 50;
+    for (int i=0; i<NUM_GAMES; i++)
+    {
+        board_t res = play_game(true);
+        fout << res << endl;
     }
 
     return 0;
