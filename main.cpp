@@ -11,35 +11,6 @@ const int MAX_DEPTH = 3;
 double row_score[MAX_VALS];
 double row_heur_score[MAX_VALS];
 
-board_t move_board(int direction, board_t state)
-{
-    // Move a board in a given direction.
-    // LTRB AWDS
-    // 0123 4567
-    // left top right bottom 4d: left up right down
-
-    switch (direction)
-    {
-        case 0: // left (left arrow)
-            return move_board_L(state);
-        case 1: // top (up arrow)
-            return move_board_T(state);
-        case 2: // right (right arrow)
-            return move_board_R(state);
-        case 3: // bottom (down arrow)
-            return move_board_B(state);
-
-        case 4: // 4D left (A key)
-            return move_board_A(state);
-        case 5: // 4D up (W key)
-            return move_board_W(state);
-        case 6: // 4D right (D key)
-            return move_board_D(state);
-        case 7: // 4D down (S key)
-            return move_board_S(state);
-    }
-}
-
 bool game_over(board_t state)
 {
     // Determines whether the game is over.
@@ -74,6 +45,15 @@ void init_heuristics()
     }
 }
 
+double board_heur_score(board_t state)
+{
+    // Return the heuristic score of all the rows.
+    return row_heur_score[(state >> 0) & ROW_MASK]
+        + row_heur_score[(state >> 16) & ROW_MASK]
+        + row_heur_score[(state >> 32) & ROW_MASK]
+        + row_heur_score[(state >> 48) & ROW_MASK];
+}
+
 double board_value(board_t state)
 {
     double value = 0;
@@ -82,14 +62,13 @@ double board_value(board_t state)
     value += row_score[(state >> 32) & ROW_MASK];
     value += row_score[(state >> 48) & ROW_MASK];
 
-    value += row_heur_score[(state >> 0) & ROW_MASK];
-    value += row_heur_score[(state >> 16) & ROW_MASK];
-    value += row_heur_score[(state >> 32) & ROW_MASK];
-    value += row_heur_score[(state >> 48) & ROW_MASK];
+    value += board_heur_score(state);
+    value += board_heur_score(transpose(state));
 
     return value;
 }
 
+// eval = expected value
 double eval_move(board_t state, int depth);
 
 double eval_spawn(board_t state, int depth)
@@ -194,9 +173,9 @@ int main()
     init_moves();
     init_heuristics();
 
-    ofstream fout("res.txt");
+    ofstream fout("hi.txt");
 
-    int NUM_GAMES = 50;
+    int NUM_GAMES = 1;
     for (int i=0; i<NUM_GAMES; i++)
     {
         board_t res = play_game(true);
