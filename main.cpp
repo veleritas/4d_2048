@@ -4,12 +4,33 @@
 #include <cassert>
 
 #include <fstream>
+#include <unordered_map>
 
 const double SCORE_EMPTY = 1000;
-const int MAX_DEPTH = 3;
+const int MAX_DEPTH = 5;
 
 double row_score[MAX_VALS];
 double row_heur_score[MAX_VALS];
+
+unordered_map<board_t, double> cache;
+
+// Count the number of empty positions (= zero nibbles) in a board.
+// Precondition: the board cannot be fully empty.
+int count_empty(board_t x)
+{
+    x |= (x >> 2) & 0x3333333333333333ULL;
+    x |= (x >> 1);
+    x = ~x & 0x1111111111111111ULL;
+    // At this point each nibble is:
+    //  0 if the original nibble was non-zero
+    //  1 if the original nibble was zero
+    // Next sum them all
+    x += x >> 32;
+    x += x >> 16;
+    x += x >>  8;
+    x += x >>  4; // this can overflow to the next nibble if there were 16 empty positions
+    return x & 0xf;
+}
 
 bool game_over(board_t state)
 {
@@ -73,9 +94,14 @@ double eval_move(board_t state, int depth);
 
 double eval_spawn(board_t state, int depth)
 {
-    int empty = 0;
-    for (int i=0; i<CELLS; i++)
-        empty += (((state >> (4 * i)) & 0xF) == 0);
+    auto lookup = cache.find(state);
+    if (lookup != cache.end())
+    {
+        // We've seen this board state before, so use cached result.
+        return lookup->second;
+    }
+
+    int empty = count_empty(state);
 
     double eval = 0;
     for (int i=0; i<CELLS; i++)
@@ -86,6 +112,8 @@ double eval_spawn(board_t state, int depth)
             eval += 0.9 * eval_move(state | (board_t(1) << (4 * i)), depth+1);
             eval += 0.1 * eval_move(state | (board_t(2) << (4 * i)), depth+1);
         }
+
+    cache[state] = eval / empty;
 
     return eval / empty;
 }
@@ -120,6 +148,8 @@ double eval_move(board_t state, int depth)
 int find_best_move(board_t state)
 {
     // Given a board state, find the best move to make.
+
+    cache.clear();
 
     int best_dir = -1;
     double best_val = -1;
@@ -175,7 +205,7 @@ int main()
 
     ofstream fout("hi.txt");
 
-    int NUM_GAMES = 1;
+    int NUM_GAMES = 100;
     for (int i=0; i<NUM_GAMES; i++)
     {
         board_t res = play_game(true);
