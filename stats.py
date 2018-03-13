@@ -1,4 +1,5 @@
 import numpy as np
+import argparse
 
 CELLS = 16
 
@@ -45,7 +46,15 @@ def stats(max_vals):
     return tiles
 
 def main():
-    vals = read_vals("res.txt")
+    parser = argparse.ArgumentParser(
+        description="Determine endgame result statistics."
+    )
+
+    parser.add_argument("fname", type=str, help="Result file name to process")
+
+    args = parser.parse_args()
+
+    vals = read_vals(args.fname)
 
     max_vals = []
     tile_counts = np.zeros(CELLS, dtype=np.int32)
