@@ -1,15 +1,16 @@
 #include "move.h"
 
 #include <unistd.h>
-#include <cassert>
 
 #include <fstream>
 #include <unordered_map>
 
-const double SCORE_EMPTY = 1000;
-const int MAX_DEPTH = 5;
+const int MAX_DEPTH = 3;
 
-double row_score[MAX_VALS];
+const double SCORE_EMPTY = 1000;
+const double SCORE_INTRA_MERGE = 50;
+const double SCORE_INTER_MERGE = 50;
+
 double row_heur_score[MAX_VALS];
 
 unordered_map<board_t, double> cache;
@@ -43,26 +44,65 @@ bool game_over(board_t state)
     return true;
 }
 
+bool intra_same(row_t sub)
+{
+    /*
+     * Check if a subrow (2x1 cells) have the same value.
+     * Example:
+     *   22 00
+     *   00 33
+     *
+     * Does not count:
+     *   01 40
+     *   00 00
+     *   13 57
+     */
+
+    return ((sub & 0xF) > 0) && ((sub & 0xF) == (sub >> 4));
+}
+
+bool inter_same(row_t row)
+{
+    /*
+     * Check if cells are the same across subrows.
+     * Example:
+     *   20 20
+     *   14 24
+     *   11 11
+     *
+     * Does not count:
+     *   13 31
+     *   45 78
+     *
+     * Assumes input has been preprocessed with: & 0xF0F
+     */
+    return ((row & 0xF) > 0) && ((row & 0xF) == (row >> 8));
+}
+
 void init_heuristics()
 {
     // Pre-calculate heuristic scores for all board positions.
 
     for (int i=0; i<MAX_VALS; i++)
     {
-        double score = 0;
+        // Reward within small cell merges:
+
+        int intra_merges = intra_same(i & 0xFF) * (i & 0xF)
+            + intra_same(i >> 8) * ((i >> 8) & 0xF);
+
+        // Reward inter subrow merges
+        int inter_merges = inter_same(i & 0xF0F) * (i & 0xF)
+            + inter_same((i >> 4) & 0xF0F) * ((i & 0xF0) >> 4);
+
+        // Reward empty cells
         int num_empty = 0;
-
         for (int j=0; j<4; j++)
-        {
-            int val = (i >> (4 * j)) & 0xF;
-            if (val == 0) // empty square
+            if (((i >> (4 * j)) & 0xF) == 0)
                 num_empty++;
-            else if (val >= 2)
-                score += (val - 1) * (1 << val);
-        }
 
-        row_score[i] = score;
-        row_heur_score[i] = num_empty * SCORE_EMPTY;
+        row_heur_score[i] = num_empty * SCORE_EMPTY
+            + intra_merges * SCORE_INTRA_MERGE
+            + inter_merges * SCORE_INTER_MERGE;
     }
 }
 
@@ -77,16 +117,8 @@ double board_heur_score(board_t state)
 
 double board_value(board_t state)
 {
-    double value = 0;
-    value += row_score[(state >> 0) & ROW_MASK];
-    value += row_score[(state >> 16) & ROW_MASK];
-    value += row_score[(state >> 32) & ROW_MASK];
-    value += row_score[(state >> 48) & ROW_MASK];
-
-    value += board_heur_score(state);
-    value += board_heur_score(transpose(state));
-
-    return value;
+    return board_heur_score(state)
+        + board_heur_score(transpose(state));
 }
 
 // eval = expected value
@@ -96,26 +128,33 @@ double eval_spawn(board_t state, int depth)
 {
     auto lookup = cache.find(state);
     if (lookup != cache.end())
-    {
-        // We've seen this board state before, so use cached result.
         return lookup->second;
-    }
 
     int empty = count_empty(state);
 
     double eval = 0;
-    for (int i=0; i<CELLS; i++)
-        if (((state >> (4 * i)) & 0xF) == 0) // empty spot
+
+    board_t temp = state;
+    board_t spawn_val = 1;
+
+    while (spawn_val) // ends after shifting left 16 times
+    {
+        if ((temp & 0xF) == 0)
         {
             // Try spawning, and see what the score will be.
 
-            eval += 0.9 * eval_move(state | (board_t(1) << (4 * i)), depth+1);
-            eval += 0.1 * eval_move(state | (board_t(2) << (4 * i)), depth+1);
+            eval += 0.9 * eval_move(state | spawn_val, depth+1);
+            eval += 0.1 * eval_move(state | (spawn_val << 1), depth+1);
         }
 
-    cache[state] = eval / empty;
+        temp >>= 4;
+        spawn_val <<= 4;
+    }
 
-    return eval / empty;
+    eval = eval / empty;
+
+    cache[state] = eval;
+    return eval;
 }
 
 double eval_move(board_t state, int depth)
@@ -132,11 +171,7 @@ double eval_move(board_t state, int depth)
     {
         board_t res = move_board(i, state);
         if (res != state)
-        {
-            double hscore = eval_spawn(res, depth);
-            if (hscore > best)
-                best = hscore;
-        }
+            best = max(best, eval_spawn(res, depth));
     }
 
     if (best < 0) // No valid moves left (game ends).
@@ -147,7 +182,7 @@ double eval_move(board_t state, int depth)
 
 int find_best_move(board_t state)
 {
-    // Given a board state, find the best move to make.
+    // Given a board state, return the direction of the best move to make.
 
     cache.clear();
 
@@ -158,13 +193,12 @@ int find_best_move(board_t state)
         board_t res = move_board(i, state);
         if (res != state) // is a valid move
         {
-            double hscore = eval_move(res, 0);
+            double hscore = eval_spawn(res, 0);
             if (hscore > best_val)
                 best_dir = i, best_val = hscore;
         }
     }
 
-    assert(best_dir != -1);
     return best_dir;
 }
 
@@ -205,7 +239,7 @@ int main()
 
     ofstream fout("hi.txt");
 
-    int NUM_GAMES = 100;
+    int NUM_GAMES = 1;
     for (int i=0; i<NUM_GAMES; i++)
     {
         board_t res = play_game(true);
