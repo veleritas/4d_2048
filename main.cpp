@@ -1,7 +1,5 @@
 #include "move.h"
 
-#include <unistd.h>
-
 #include <fstream>
 #include <unordered_map>
 
@@ -12,7 +10,10 @@ const double SCORE_EMPTY = 1000;
 const double SCORE_INTRA_MERGE = 50;
 const double SCORE_INTER_MERGE = 50;
 
+const double SCORE_SQR_MIDDLE = 100;
+
 double row_heur_score[MAX_VALS];
+double sqr_heur_score[MAX_VALS];
 
 unordered_map<board_t, double> cache;
 
@@ -83,7 +84,7 @@ bool inter_same(row_t row)
     return ((row & 0xF) > 0) && ((row & 0xF) == (row >> 8));
 }
 
-void init_heuristics()
+void init_row_heuristics()
 {
     // Pre-calculate heuristic scores for all board positions.
 
@@ -110,6 +111,96 @@ void init_heuristics()
     }
 }
 
+row_t subsqr(int idx, board_t state)
+{
+    /*
+     * Get the idx th 2x2 subsquare as a 16 bit number.
+     * Example:
+     *
+     * Given the board
+     * +--+--+
+     * |f1|38|
+     * |0c|7b|
+     * +--+--+
+     * |00|b2|
+     * |5c|f1|
+     * +--+--+
+     *
+     * the 2nd subsqr is:
+     *
+     * +--+--+
+     * |00|00|
+     * |5c|00|
+     * +--+--+
+     * |00|00|
+     * |00|00|
+     * +--+--+
+     *
+     * which is converted to 0xC500
+    */
+
+    board_t subsqr = state >> SQR_SHIFTS[idx];
+    return ((subsqr >> 8) & 0xFF00) | (subsqr & 0xFF);
+}
+
+void swap(int &a, int &b)
+{
+    int temp = b;
+    b = a;
+    a = temp;
+}
+
+bool is_middle(int i, int a, int b)
+{
+    // Checks that i is the middle value of {i, a, b}
+    if (a > b)
+        swap(a, b);
+
+    // do we allow zeroes as the smaller one?
+    return (a < i) && (b > i);
+}
+
+void init_sqr_heuristics()
+{
+    // Generate heuristic scores for the 2x2 subsquares.
+    for (int i=0; i<MAX_VALS; i++)
+    {
+        // Reward one smaller, one bigger for adjacent tiles
+        int middles = is_middle(i & 0xF, (i >> 4) & 0xF, (i >> 8) & 0xF)
+            + is_middle((i >> 4) & 0xF, i & 0xF, i >> 12)
+            + is_middle((i >> 8) & 0xF, i & 0xF, i >> 12)
+            + is_middle(i >> 12, (i >> 4) & 0xF, (i >> 8) & 0xF);
+
+        sqr_heur_score[i] = middles * SCORE_SQR_MIDDLE;
+    }
+}
+
+void init_heuristics()
+{
+    init_row_heuristics();
+    init_sqr_heuristics();
+}
+
+void test()
+{
+    board_t a = rand_start();
+
+    puts("original");
+    draw_board(a);
+
+    cout << endl;
+
+    // shift amounts aren't nice (unfortunately)
+    for (int i=0; i<4; i++)
+    {
+        draw_board((a >> SQR_SHIFTS[i]) & SQR_MASK);
+        draw_row(subsqr(i, a));
+
+        cout << sqr_heur_score[subsqr(i, a)] << endl;
+    }
+
+}
+
 double board_heur_score(board_t state)
 {
     // Return the heuristic score of all the rows.
@@ -119,10 +210,19 @@ double board_heur_score(board_t state)
         + row_heur_score[(state >> 48) & ROW_MASK];
 }
 
+double board_sqr_heur_score(board_t state)
+{
+    return sqr_heur_score[subsqr(0, state)]
+        + sqr_heur_score[subsqr(1, state)]
+        + sqr_heur_score[subsqr(2, state)]
+        + sqr_heur_score[subsqr(3, state)];
+}
+
 double board_value(board_t state)
 {
     return board_heur_score(state)
-        + board_heur_score(transpose(state));
+        + board_heur_score(transpose(state))
+        + board_sqr_heur_score(state);
 }
 
 // eval = expected value
