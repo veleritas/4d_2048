@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <chrono>
 #include <cassert>
+#include <utility>
 
 const int MAX_DEPTH = 4;
 const double CPROB_MINIMUM = 0.005;
@@ -322,7 +323,7 @@ int find_best_move(board_t state)
     return best_dir;
 }
 
-board_t play_game()
+pair<board_t, int> play_game()
 {
     // Play a single game and return the end position of the game.
 
@@ -351,7 +352,7 @@ board_t play_game()
         draw_board(state);
     }
 
-    return state;
+    return make_pair(state, moves);
 }
 
 int main(int argc, char* argv[])
@@ -378,7 +379,10 @@ int main(int argc, char* argv[])
     ofstream fout(argv[2]);
 
     while (num_games--)
-        fout << play_game() << endl;
+    {
+        pair<board_t, int> res = play_game();
+        fout << res.first << " " << res.second << endl;
+    }
 
     return 0;
 }
