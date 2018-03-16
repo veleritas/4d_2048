@@ -2,9 +2,11 @@
 
 #include <fstream>
 #include <unordered_map>
+#include <chrono>
+#include <cassert>
 
-const int MAX_DEPTH = 8;
-const double CPROB_MINIMUM = 0.001;
+const int MAX_DEPTH = 4;
+const double CPROB_MINIMUM = 0.005;
 
 const double SCORE_EMPTY = 1000;
 const double SCORE_INTRA_MERGE = 50;
@@ -225,7 +227,8 @@ double board_value(board_t state)
         + board_sqr_heur_score(state);
 }
 
-// eval = expected value
+//------------------------------------------------------------------------------
+
 double eval_move(board_t state, int depth, double cprob);
 
 double eval_spawn(board_t state, int depth, double cprob)
@@ -243,7 +246,6 @@ double eval_spawn(board_t state, int depth, double cprob)
     visited++;
 
     int empty = count_empty(state);
-
     cprob /= empty;
 
     double eval = 0;
@@ -257,8 +259,8 @@ double eval_spawn(board_t state, int depth, double cprob)
         {
             // Try spawning, and see what the score will be.
 
-            eval += 0.9 * eval_move(state | spawn_val, depth+1, cprob * 0.9);
             eval += 0.1 * eval_move(state | (spawn_val << 1), depth+1, cprob * 0.1);
+            eval += 0.9 * eval_move(state | spawn_val, depth+1, cprob * 0.9);
         }
 
         temp >>= 4;
@@ -291,6 +293,8 @@ double eval_move(board_t state, int depth, double cprob)
     return best;
 }
 
+//------------------------------------------------------------------------------
+
 int find_best_move(board_t state)
 {
     // Given a board state, return the direction of the best move to make.
@@ -318,49 +322,63 @@ int find_best_move(board_t state)
     return best_dir;
 }
 
-board_t play_game(bool draw_game)
+board_t play_game()
 {
     // Play a single game and return the end position of the game.
-    // Draw the game state to the screen if directed to do so.
 
     board_t state = spawn_tile(spawn_tile(0));
+    draw_board(state);
 
-    if (draw_game)
-        draw_board(state);
-
+    int moves = 0;
     while (!game_over(state))
     {
+        auto start = std::chrono::system_clock::now();
         int move = find_best_move(state);
+        auto stop = std::chrono::system_clock::now();
 
-        if (draw_game)
-            printf("Moving: %c\n", MOVE_NAME[move]);
+        std::chrono::duration<double> search_time = stop - start;
+
+        moves++;
+
+        printf("Moving: %c\n", MOVE_NAME[move]);
+        printf("Move #%d\n", moves);
+        printf("Search time: %6fs\n", search_time.count());
 
         state = move_board(move, state);
         state = spawn_tile(state);
 
-        if (draw_game)
-        {
-            printf("After move:\n");
-            draw_board(state);
-        }
+        puts("Result:");
+        draw_board(state);
     }
 
     return state;
 }
 
-int main()
+int main(int argc, char* argv[])
 {
     init_moves();
     init_heuristics();
 
-    ofstream fout("hi.txt");
+    /*
+     * Play a single game if no parameters are provided.
+     * Otherwise play a variable number of games and save results to a file.
+     * Command line argument order: num_games, file_name
+     */
 
-    int NUM_GAMES = 1;
-    for (int i=0; i<NUM_GAMES; i++)
+    if (argc == 1)
     {
-        board_t res = play_game(true);
-        fout << res << endl;
+        play_game();
+        return 0;
     }
+
+    assert(argc == 3);
+
+    int num_games = atoi(argv[1]);
+    assert(num_games > 0);
+    ofstream fout(argv[2]);
+
+    while (num_games--)
+        fout << play_game() << endl;
 
     return 0;
 }
