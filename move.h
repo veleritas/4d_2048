@@ -11,23 +11,6 @@ row_t move_D[MAX_VALS]; // D key
 board_t move_W[MAX_VALS]; // W key
 board_t move_S[MAX_VALS]; // S key
 
-// Transpose rows/columns in a board:
-//   0123       048c
-//   4567  -->  159d
-//   89ab       26ae
-//   cdef       37bf
-board_t transpose(board_t x)
-{
-    board_t a1 = x & 0xF0F00F0FF0F00F0FULL;
-    board_t a2 = x & 0x0000F0F00000F0F0ULL;
-    board_t a3 = x & 0x0F0F00000F0F0000ULL;
-    board_t a = a1 | (a2 << 12) | (a3 >> 12);
-    board_t b1 = a & 0xFF00FF0000FF00FFULL;
-    board_t b2 = a & 0x00FF00FF00000000ULL;
-    board_t b3 = a & 0x00000000FF00FF00ULL;
-    return b1 | (b2 >> 24) | (b3 << 24);
-}
-
 void init_LR()
 {
     // Generate lookup tables for moving left and right.
