@@ -6,12 +6,15 @@
 #include <cassert>
 #include <utility>
 
+#include <string>
+
 const int MAX_DEPTH = 4;
 const double CPROB_MINIMUM = 0.005;
 
-const double SCORE_EMPTY = 1000;
-const double SCORE_INTRA_MERGE = 50;
-const double SCORE_INTER_MERGE = 50;
+const double BASE_SCORE = 10000;
+const double SCORE_EMPTY = 350;
+const double SCORE_MERGE = 70;
+const double SCORE_ORDERED = 5;
 
 double row_heur_score[MAX_VALS];
 
@@ -66,14 +69,21 @@ bool inter_same(row_t row)
     return ((row & 0xF) > 0) && ((row & 0xF) == (row >> 8));
 }
 
+int diff(row_t chunk)
+{
+    // chunk should only be two tiles wide
+    return (chunk >> 4) - (chunk & 0xF);
+}
+
 void init_row_heuristics()
 {
     // Pre-calculate heuristic scores for all board positions.
 
+    // when all else equal, reward bigger tiles on the board
+
     for (int i=0; i<MAX_VALS; i++)
     {
         // Reward within small cell merges:
-
         int intra_merges = intra_same(i & 0xFF) * (i & 0xF)
             + intra_same(i >> 8) * ((i >> 8) & 0xF);
 
@@ -84,12 +94,14 @@ void init_row_heuristics()
         // Reward empty cells
         int num_empty = 0;
         for (int j=0; j<4; j++)
-            if (((i >> (4 * j)) & 0xF) == 0)
-                num_empty++;
+            num_empty += (((i >> (4 * j)) & 0xF) == 0);
 
-        row_heur_score[i] = num_empty * SCORE_EMPTY
-            + intra_merges * SCORE_INTRA_MERGE
-            + inter_merges * SCORE_INTER_MERGE;
+        row_heur_score[i] = BASE_SCORE
+            + num_empty * SCORE_EMPTY
+            + intra_merges * SCORE_MERGE
+            + inter_merges * SCORE_MERGE
+            + SCORE_ORDERED * diff(i & 0xFF)
+            + SCORE_ORDERED * diff(i >> 8);
     }
 }
 
@@ -240,10 +252,32 @@ pair<board_t, int> play_game()
     return make_pair(state, moves);
 }
 
+string tohex(row_t row)
+{
+    const char vals[] = "0123456789abcdef";
+
+    string res = "";
+    for (int i=0; i<4; i++)
+    {
+        res += vals[row & 0xF];
+        row >>= 4;
+    }
+
+    return res;
+}
+
 int main(int argc, char* argv[])
 {
     init_moves();
     init_heuristics();
+
+/*
+    ofstream test("hi.txt");
+    for (int i=0; i<MAX_VALS; i++)
+        test << i << " " << tohex(i) << " " << row_heur_score[i] << endl;
+
+    return 0;
+*/
 
     /*
      * Play a single game if no parameters are provided.
