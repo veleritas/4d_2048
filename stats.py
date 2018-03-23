@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import argparse
 
 CELLS = 16
@@ -23,27 +24,13 @@ def count_tiles(state):
     return vals
 
 def read_vals(fname):
-    vals = []
-    with open(fname, "r") as fin:
-        for line in fin:
-            line = line.rstrip("\n")
-            vals.append(int(line))
+    return pd.read_csv(fname, sep=" ", names=["endstate", "moves"]);
 
-    return vals
+def max_size(state):
+    # Given an endgame state, determine the largest achieved tile
 
-def stats(max_vals):
-    tiles = np.zeros(CELLS, dtype=np.int32)
-    for mval in max_vals:
-        tiles[mval] += 1
-
-    print("Performance stats for {} games:".format(len(max_vals)))
-
-    idxs = np.flip(np.nonzero(tiles)[0], 0)
-    for val, count in zip(idxs, tiles[idxs]):
-        percent = count / len(max_vals) * 100
-        print("Got 2^{0} ({1}) {2} times ({3:.2f}%)".format(val, 2**val, count, percent))
-
-    return tiles
+    tiles = count_tiles(state)
+    return np.max(np.nonzero(tiles))
 
 def main():
     parser = argparse.ArgumentParser(
@@ -51,21 +38,33 @@ def main():
     )
 
     parser.add_argument("fname", type=str, help="Result file name to process")
-
     args = parser.parse_args()
 
-    vals = read_vals(args.fname)
+#-------------------------------------------------------------------------------
 
-    max_vals = []
-    tile_counts = np.zeros(CELLS, dtype=np.int32)
+    data = (read_vals(args.fname)
+        .assign(max_tile = lambda df: df["endstate"].map(max_size))
+    )
 
-    for state in vals:
-        tiles = count_tiles(state)
+    ngames = len(data)
+    print("Performance stats for {} games:".format(ngames))
 
-        mtile = np.max(np.nonzero(tiles))
-        max_vals.append(mtile)
+    for i in range(11, 16):
+        num = len(data.query("max_tile >= @i"))
+        percent = num / ngames * 100
 
-    stats(max_vals)
+        print("Got to 2^{0} ({1}) {2} times ({3:.2f}%)".format(i, 2**i, num, percent))
+
+    print()
+
+    print("Largest endgame tiles:")
+    res = (data["max_tile"]
+        .value_counts()
+        .sort_index()
+        .to_frame()
+        .assign(percent = lambda df: df["max_tile"] / ngames * 100)
+    )
+    print(res)
 
 if __name__ == "__main__":
     main()
