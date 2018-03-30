@@ -11,23 +11,6 @@ row_t move_D[MAX_VALS]; // D key
 board_t move_W[MAX_VALS]; // W key
 board_t move_S[MAX_VALS]; // S key
 
-// Transpose rows/columns in a board:
-//   0123       048c
-//   4567  -->  159d
-//   89ab       26ae
-//   cdef       37bf
-board_t transpose(board_t x)
-{
-    board_t a1 = x & 0xF0F00F0FF0F00F0FULL;
-    board_t a2 = x & 0x0000F0F00000F0F0ULL;
-    board_t a3 = x & 0x0F0F00000F0F0000ULL;
-    board_t a = a1 | (a2 << 12) | (a3 >> 12);
-    board_t b1 = a & 0xFF00FF0000FF00FFULL;
-    board_t b2 = a & 0x00FF00FF00000000ULL;
-    board_t b3 = a & 0x00000000FF00FF00ULL;
-    return b1 | (b2 >> 24) | (b3 << 24);
-}
-
 void init_LR()
 {
     // Generate lookup tables for moving left and right.
@@ -218,4 +201,33 @@ board_t move_board_S(board_t state)
     res |= move_S[(temp >> 48) & ROW_MASK] << 12;
 
     return res;
+}
+
+board_t move_board(int direction, board_t state)
+{
+    // Move a board in a given direction.
+    // LTRB AWDS
+    // 0123 4567
+    // left top right bottom 4d: left up right down
+
+    switch (direction)
+    {
+        case 0: // left (left arrow)
+            return move_board_L(state);
+        case 1: // top (up arrow)
+            return move_board_T(state);
+        case 2: // right (right arrow)
+            return move_board_R(state);
+        case 3: // bottom (down arrow)
+            return move_board_B(state);
+
+        case 4: // 4D left (A key)
+            return move_board_A(state);
+        case 5: // 4D up (W key)
+            return move_board_W(state);
+        case 6: // 4D right (D key)
+            return move_board_D(state);
+        case 7: // 4D down (S key)
+            return move_board_S(state);
+    }
 }
