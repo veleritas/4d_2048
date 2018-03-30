@@ -6,9 +6,7 @@
 #include <cassert>
 #include <utility>
 
-#include <string>
-
-const int MAX_DEPTH = 4;
+const int MAX_DEPTH = 5;
 const double CPROB_MINIMUM = 0.005;
 
 const double BASE_SCORE = 10000;
@@ -21,12 +19,9 @@ double row_heur_score[MAX_VALS];
 unordered_map<board_t, double> cache;
 
 int visited;
-int mdepth;
 
 bool game_over(board_t state)
 {
-    // Determines whether the game is over.
-
     for (int i=0; i<NUM_MOVES; i++)
         if (move_board(i, state) != state)
             return false;
@@ -75,11 +70,9 @@ int diff(row_t chunk)
     return (chunk >> 4) - (chunk & 0xF);
 }
 
-void init_row_heuristics()
+void init_heuristics()
 {
     // Pre-calculate heuristic scores for all board positions.
-
-    // when all else equal, reward bigger tiles on the board
 
     for (int i=0; i<MAX_VALS; i++)
     {
@@ -105,11 +98,6 @@ void init_row_heuristics()
     }
 }
 
-void init_heuristics()
-{
-    init_row_heuristics();
-}
-
 double board_heur_score(board_t state)
 {
     // Return the heuristic score of all the rows.
@@ -132,10 +120,7 @@ double eval_move(board_t state, int depth, double cprob);
 double eval_spawn(board_t state, int depth, double cprob)
 {
     if (cprob < CPROB_MINIMUM || depth >= MAX_DEPTH)
-    {
-        mdepth = max(mdepth, depth);
         return board_value(state);
-    }
 
     auto lookup = cache.find(state);
     if (lookup != cache.end())
@@ -198,7 +183,6 @@ int find_best_move(board_t state)
     // Given a board state, return the direction of the best move to make.
 
     visited = 0;
-    mdepth = 0;
     cache.clear();
 
     int best_dir = -1;
@@ -215,7 +199,6 @@ int find_best_move(board_t state)
     }
 
     printf("Visited: %d\n", visited);
-    printf("Max depth: %d\n", mdepth);
 
     return best_dir;
 }
@@ -252,32 +235,10 @@ pair<board_t, int> play_game()
     return make_pair(state, moves);
 }
 
-string tohex(row_t row)
-{
-    const char vals[] = "0123456789abcdef";
-
-    string res = "";
-    for (int i=0; i<4; i++)
-    {
-        res += vals[row & 0xF];
-        row >>= 4;
-    }
-
-    return res;
-}
-
 int main(int argc, char* argv[])
 {
     init_moves();
     init_heuristics();
-
-/*
-    ofstream test("hi.txt");
-    for (int i=0; i<MAX_VALS; i++)
-        test << i << " " << tohex(i) << " " << row_heur_score[i] << endl;
-
-    return 0;
-*/
 
     /*
      * Play a single game if no parameters are provided.
